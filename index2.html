@@ -119,9 +119,34 @@
 
     let allPoints = [];
     let markerList = [];
-    let tempMarker = null; // 臨時定位針
+    let tempMarker = null;
 
     const colorMap = { "05/31": "blue", "06/01": "red", "06/02": "orange", "06/03": "violet", "06/04": "green", "06/05": "gold", "06/06": "black" };
+
+    // --- 新增：自動匯入功能 ---
+    window.onload = function() {
+        const defaultFile = 'Sendai_Aomori_Trip.json';
+        fetch(defaultFile)
+            .then(response => {
+                if (!response.ok) throw new Error('找不到預設 JSON 檔');
+                return response.json();
+            })
+            .then(data => {
+                console.log('成功載入預設行程:', defaultFile);
+                allPoints = data;
+                allPoints.sort((a, b) => a.date.localeCompare(b.date));
+                renderMarkers();
+                // 自動縮放地圖以包含所有點
+                if(markerList.length > 0) {
+                    const group = new L.featureGroup(markerList);
+                    map.fitBounds(group.getBounds().pad(0.3));
+                }
+            })
+            .catch(err => {
+                console.warn('自動匯入提示:', err.message);
+            });
+    };
+    // ------------------------
 
     function getDistance(lat1, lon1, lat2, lon2) {
         const R = 6371;
@@ -140,12 +165,9 @@
         });
     }
 
-    // 地圖點擊：放置臨時針
     map.on('click', (e) => {
         if (tempMarker) map.removeLayer(tempMarker);
         tempMarker = L.marker(e.latlng, { icon: createIcon('blue', true), opacity: 0.6 }).addTo(map);
-        
-        // 點擊臨時針彈出輸入視窗
         tempMarker.on('click', () => {
             document.getElementById('point-form').reset();
             document.getElementById('add-modal').showModal();
@@ -157,7 +179,6 @@
         document.getElementById('add-modal').close();
     }
 
-    // 表單提交：正式存檔
     document.getElementById('point-form').onsubmit = (e) => {
         e.preventDefault();
         const pos = tempMarker.getLatLng();
@@ -170,10 +191,8 @@
             note: document.getElementById('in-note').value,
             trans: { m: "🚗 自駕", d: "--", t: "--" }
         };
-        
         allPoints.push(newP);
-        allPoints.sort((a, b) => a.date.localeCompare(b.date)); // 重新排序
-        
+        allPoints.sort((a, b) => a.date.localeCompare(b.date));
         map.removeLayer(tempMarker);
         tempMarker = null;
         renderMarkers();
@@ -183,10 +202,8 @@
     function openDetail(index) {
         const p = allPoints[index];
         const nextP = allPoints[index + 1], prevP = allPoints[index - 1];
-
         document.getElementById('modal-title').innerText = p.title;
         document.getElementById('modal-note').innerHTML = p.note.replace(/\n/g, '<br>');
-        
         document.getElementById('prev-title').innerText = prevP ? prevP.title : "行程起點";
         document.getElementById('next-title').innerText = nextP ? nextP.title : "行程終點";
         document.getElementById('prev-btn').onclick = () => prevP && openDetail(index - 1);
@@ -211,7 +228,6 @@
 
         const query = p.keyword ? p.keyword : (p.title + " 景點 介紹");
         document.getElementById('info-frame').src = `https://www.google.com/search?q=${encodeURIComponent(query)}&igu=1`;
-        
         document.getElementById('detail-modal').showModal();
         markerList.forEach((m, i) => m.setIcon(createIcon(colorMap[allPoints[i].date] || "grey", i === index)));
     }
@@ -242,7 +258,7 @@
         const blob = new Blob([JSON.stringify(allPoints, null, 2)], { type: "application/json" });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = "White6_TravelPlan.json";
+        a.download = "Sendai_Aomori_Trip_Export.json";
         a.click();
     }
 </script>
