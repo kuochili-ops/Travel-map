@@ -3,23 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>白六快傳地圖 - 行程編輯器</title>
+    <title>白六快傳地圖 - 連鎖探索版</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        :root { --primary-color: #2d5a27; --accent-blue: #007aff; --warn-bg: #fffbe6; }
+        :root { --primary-color: #2d5a27; --accent-blue: #007aff; --warn-bg: #fffbe6; --recommend-bg: #eef7ee; }
         body { font-family: -apple-system, "Microsoft JhengHei", sans-serif; margin: 0; overflow: hidden; background: #f4f4f2; }
         #map { height: 100vh; width: 100%; z-index: 1; }
 
-        /* 控制面板 */
         .io-controls { 
             position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%);
             z-index: 1000; display: flex; gap: 12px; background: rgba(255,255,255,0.95);
             padding: 10px 20px; border-radius: 50px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
             backdrop-filter: blur(5px);
         }
-        .io-btn { padding: 8px 18px; border-radius: 20px; border: none; color: white; font-weight: bold; cursor: pointer; font-size: 13px; }
+        .io-btn { padding: 8px 18px; border-radius: 20px; border: none; color: white; font-weight: bold; cursor: pointer; font-size: 13px; transition: 0.2s; }
+        .io-btn:active { transform: scale(0.95); }
 
-        /* 統一彈窗樣式 */
         dialog {
             border: none; border-radius: 28px; padding: 0; width: 92%; max-width: 500px;
             box-shadow: 0 25px 70px rgba(0,0,0,0.5); outline: none;
@@ -28,23 +27,25 @@
         .modal-header { background: var(--primary-color); color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
         .modal-body { max-height: 75vh; overflow-y: auto; background: white; padding: 20px; }
 
-        /* 輸入表單 */
         .editor-form { display: flex; flex-direction: column; gap: 12px; }
-        .editor-form label { font-size: 12px; color: #666; font-weight: bold; margin-bottom: -5px; }
+        .editor-form label { font-size: 11px; color: #666; font-weight: bold; margin-bottom: -5px; text-transform: uppercase; }
         .editor-form input, .editor-form textarea, .editor-form select { 
-            padding: 12px; border: 1px solid #ddd; border-radius: 12px; font-size: 14px; width: 100%; box-sizing: border-box;
+            padding: 12px; border: 1px solid #ddd; border-radius: 12px; font-size: 14px; width: 100%; box-sizing: border-box; outline: none;
         }
+        .editor-form input:focus { border-color: var(--primary-color); }
 
-        /* 導覽元件樣式 */
-        .nav-links { display: flex; gap: 8px; margin-bottom: 15px; }
-        .nav-link-btn { flex: 1; padding: 10px; border: 1px solid #eee; border-radius: 12px; background: #fdfdfd; cursor: pointer; text-align: left; }
-        .nav-link-btn span { display: block; font-size: 10px; color: #999; }
-        .nav-link-btn strong { display: block; font-size: 13px; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .transport-dashboard { background: var(--warn-bg); border: 1px solid #ffe58f; border-radius: 15px; padding: 12px; margin-bottom: 15px; display: flex; justify-content: space-between; }
-        .trans-item { text-align: center; flex: 1; }
-        .trans-label { font-size: 10px; color: #856404; opacity: 0.7; display: block; }
-        .trans-value { font-size: 14px; font-weight: bold; color: #856404; }
-        .note-box { font-size: 15px; color: #444; line-height: 1.6; padding: 15px; background: #f8faf8; border-radius: 15px; border-left: 5px solid var(--primary-color); margin-bottom: 10px; }
+        /* 推薦區塊樣式 */
+        #recommend-section {
+            margin-top: 5px; padding: 15px; background: var(--recommend-bg); 
+            border: 1.5px dashed var(--primary-color); border-radius: 18px; 
+            display: none; animation: fadeIn 0.3s ease;
+        }
+        .rec-tag { font-size: 10px; background: var(--primary-color); color: white; padding: 2px 8px; border-radius: 8px; margin-bottom: 8px; display: inline-block; }
+        .rec-content { display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+        .rec-content strong { color: #1a3317; font-size: 15px; }
+        .rec-go { color: var(--primary-color); font-size: 12px; font-weight: bold; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
         .transparent-pin { background: none !important; border: none !important; }
         .transparent-pin img { filter: drop-shadow(0 3px 2px rgba(0,0,0,0.3)); }
@@ -54,7 +55,7 @@
 <body>
 
 <div id="map"></div>
-<div class="hint-overlay">📍 點擊地圖任何位置即可「新增自訂景點」</div>
+<div class="hint-overlay">📍 點擊地圖位置即可「新增景點」</div>
 
 <div class="io-controls">
     <button class="io-btn" style="background:var(--primary-color)" onclick="exportData()">📤 匯出 JSON</button>
@@ -64,12 +65,12 @@
 
 <dialog id="add-modal">
     <div class="modal-header">
-        <span>新增行程景點</span>
+        <span style="font-weight: bold;">新增行程景點</span>
         <button style="background:none; border:none; color:white; font-size:30px; cursor:pointer;" onclick="closeAddModal()">×</button>
     </div>
     <div class="modal-body">
         <form class="editor-form" id="point-form">
-            <label>旅行日期</label>
+            <label>日期</label>
             <select id="in-date">
                 <option value="05/31">05/31 (Day 1)</option>
                 <option value="06/01">06/01 (Day 2)</option>
@@ -77,38 +78,25 @@
                 <option value="06/03">06/03 (Day 4)</option>
                 <option value="06/04">06/04 (Day 5)</option>
                 <option value="06/05">06/05 (Day 6)</option>
-                <option value="06/06">06/06 (Day 7)</option>
             </select>
             <label>景點名稱</label>
-            <input type="text" id="in-title" placeholder="輸入地點名稱..." required>
-            <label>AI 搜尋關鍵字 (選填)</label>
-            <input type="text" id="in-keyword" placeholder="自訂關鍵字，如：必吃美食、停車資訊">
-            <label>個人註解</label>
-            <textarea id="in-note" rows="3" placeholder="想記錄的事情..."></textarea>
-            <button type="submit" class="io-btn" style="background:var(--primary-color); padding: 15px; margin-top: 10px;">💾 儲存並加入行程</button>
-        </form>
-    </div>
-</dialog>
+            <input type="text" id="in-title" placeholder="例如：仙台車站..." required>
+            
+            <div id="recommend-section">
+                <div class="rec-tag">🌟 網路熱門連鎖建議</div>
+                <div class="rec-content" id="rec-trigger">
+                    <strong id="rec-name">讀取建議中...</strong>
+                    <span class="rec-go">存完去這站 →</span>
+                </div>
+            </div>
 
-<dialog id="detail-modal">
-    <div class="modal-header">
-        <span id="modal-title" style="font-weight:bold;">景點導覽</span>
-        <button style="background:none; border:none; color:white; font-size:30px; cursor:pointer;" onclick="this.closest('dialog').close()">×</button>
-    </div>
-    <div class="modal-body" style="padding:0;">
-        <div class="nav-tower" style="padding:15px;">
-            <div class="nav-links">
-                <button id="prev-btn" class="nav-link-btn"><span>← 上一站</span><strong id="prev-title">無</strong></button>
-                <button id="next-btn" class="nav-link-btn"><span>下一站 →</span><strong id="next-title">無</strong></button>
-            </div>
-            <div id="trans-dash" class="transport-dashboard">
-                <div class="trans-item"><span class="trans-label">方式</span><span id="v-method" class="trans-value">🚗</span></div>
-                <div class="trans-item"><span class="trans-label">距離</span><span id="v-dist" class="trans-value">--</span></div>
-                <div class="trans-item"><span class="trans-label">時間</span><span id="v-time" class="trans-value">--</span></div>
-            </div>
-            <div id="modal-note" class="note-box"></div>
-        </div>
-        <iframe id="info-frame" style="width:100%; height:45vh; border:none; border-top:1px solid #eee;" src=""></iframe>
+            <label>搜尋關鍵字</label>
+            <input type="text" id="in-keyword" placeholder="自動搜尋內容...">
+            <label>個人註解</label>
+            <textarea id="in-note" rows="2" placeholder="備註..."></textarea>
+            
+            <button type="submit" class="io-btn" style="background:var(--primary-color); padding: 15px; margin-top: 10px; width:100%; border-radius: 15px;">💾 儲存景點</button>
+        </form>
     </div>
 </dialog>
 
@@ -119,17 +107,26 @@
 
     let allPoints = [];
     let markerList = [];
-    let tempMarker = null; // 臨時定位針
+    let tempMarker = null;
 
-    const colorMap = { "05/31": "blue", "06/01": "red", "06/02": "orange", "06/03": "violet", "06/04": "green", "06/05": "gold", "06/06": "black" };
+    const colorMap = { "05/31": "blue", "06/01": "red", "06/02": "orange", "06/03": "violet", "06/04": "green", "06/05": "gold" };
 
-    function getDistance(lat1, lon1, lat2, lon2) {
-        const R = 6371;
-        const dLat = (lat2 - lat1) * Math.PI / 180;
-        const dLon = (lon2 - lon1) * Math.PI / 180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-        return (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))).toFixed(1);
-    }
+    // 模擬推薦資料庫
+    const travelRecs = {
+        "仙台": ["松島海岸", "瑞鳳殿", "仙台朝市", "青葉城"],
+        "松島": ["福浦島", "五大堂", "瑞嚴寺"],
+        "奧入瀨": ["十和田湖", "銚子大瀑布", "雲井之瀧"],
+        "十和田": ["乙女之像", "十和田神社"],
+        "弘前": ["弘前公園", "弘前星巴克", "最勝院"]
+    };
+
+    window.onload = () => {
+        fetch('Sendai_Aomori_Trip.json').then(r => r.json()).then(data => {
+            allPoints = data;
+            renderMarkers();
+            if(markerList.length > 0) map.fitBounds(new L.featureGroup(markerList).getBounds().pad(0.3));
+        }).catch(e => console.log("等待手動匯入或找不到預設檔"));
+    };
 
     function createIcon(color, isBig) {
         const size = isBig ? [46, 75] : [30, 48];
@@ -140,110 +137,110 @@
         });
     }
 
-    // 地圖點擊：放置臨時針
     map.on('click', (e) => {
         if (tempMarker) map.removeLayer(tempMarker);
-        tempMarker = L.marker(e.latlng, { icon: createIcon('blue', true), opacity: 0.6 }).addTo(map);
-        
-        // 點擊臨時針彈出輸入視窗
+        tempMarker = L.marker(e.latlng, { icon: createIcon('blue', true), opacity: 0.7 }).addTo(map);
         tempMarker.on('click', () => {
             document.getElementById('point-form').reset();
+            document.getElementById('recommend-section').style.display = 'none';
             document.getElementById('add-modal').showModal();
         });
     });
 
-    function closeAddModal() {
-        if (tempMarker) map.removeLayer(tempMarker);
-        document.getElementById('add-modal').close();
-    }
+    // 監聽輸入動態顯示推薦
+    document.getElementById('in-title').addEventListener('input', (e) => {
+        const val = e.target.value;
+        const section = document.getElementById('recommend-section');
+        const nameBox = document.getElementById('rec-name');
+        
+        let found = null;
+        for(let key in travelRecs) {
+            if(val.includes(key)) found = travelRecs[key][Math.floor(Math.random()*travelRecs[key].length)];
+        }
 
-    // 表單提交：正式存檔
-    document.getElementById('point-form').onsubmit = (e) => {
-        e.preventDefault();
+        if(val.length >= 2 && found) {
+            section.style.display = 'block';
+            nameBox.innerText = found;
+        } else {
+            section.style.display = 'none';
+        }
+    });
+
+    // 執行連鎖儲存
+    document.getElementById('rec-trigger').onclick = function() {
+        const recTitle = document.getElementById('rec-name').innerText;
+        saveCurrentPoint(); // 儲存當前點
+
+        // 生成下一站座標 (原位置微幅偏移，模擬附近移動)
+        const currentPos = tempMarker.getLatLng();
+        const nextLat = currentPos.lat + (Math.random() - 0.5) * 0.015;
+        const nextLng = currentPos.lng + (Math.random() - 0.5) * 0.015;
+
+        // 更新臨時針並預填
+        map.removeLayer(tempMarker);
+        tempMarker = L.marker([nextLat, nextLng], { icon: createIcon('blue', true), opacity: 0.7 }).addTo(map);
+        map.panTo([nextLat, nextLng]);
+
+        document.getElementById('in-title').value = recTitle;
+        document.getElementById('in-keyword').value = recTitle + " 介紹";
+        document.getElementById('in-note').value = "根據行程推薦自動生成。";
+        document.getElementById('recommend-section').style.display = 'none';
+    };
+
+    function saveCurrentPoint() {
         const pos = tempMarker.getLatLng();
-        const newP = {
+        const p = {
             date: document.getElementById('in-date').value,
-            lat: pos.lat,
-            lng: pos.lng,
+            lat: pos.lat, lng: pos.lng,
             title: document.getElementById('in-title').value,
-            keyword: document.getElementById('in-keyword').value,
+            keyword: document.getElementById('in-keyword').value || document.getElementById('in-title').value,
             note: document.getElementById('in-note').value,
             trans: { m: "🚗 自駕", d: "--", t: "--" }
         };
-        
-        allPoints.push(newP);
-        allPoints.sort((a, b) => a.date.localeCompare(b.date)); // 重新排序
-        
+        allPoints.push(p);
+        allPoints.sort((a, b) => a.date.localeCompare(b.date));
+        renderMarkers();
+    }
+
+    document.getElementById('point-form').onsubmit = (e) => {
+        e.preventDefault();
+        saveCurrentPoint();
         map.removeLayer(tempMarker);
         tempMarker = null;
-        renderMarkers();
         document.getElementById('add-modal').close();
     };
-
-    function openDetail(index) {
-        const p = allPoints[index];
-        const nextP = allPoints[index + 1], prevP = allPoints[index - 1];
-
-        document.getElementById('modal-title').innerText = p.title;
-        document.getElementById('modal-note').innerHTML = p.note.replace(/\n/g, '<br>');
-        
-        document.getElementById('prev-title').innerText = prevP ? prevP.title : "行程起點";
-        document.getElementById('next-title').innerText = nextP ? nextP.title : "行程終點";
-        document.getElementById('prev-btn').onclick = () => prevP && openDetail(index - 1);
-        document.getElementById('next-btn').onclick = () => nextP && openDetail(index + 1);
-
-        const dash = document.getElementById('trans-dash');
-        if (nextP) {
-            dash.style.display = 'flex';
-            if (p.trans && p.trans.d !== "--") {
-                document.getElementById('v-method').innerText = p.trans.m;
-                document.getElementById('v-dist').innerText = p.trans.d;
-                document.getElementById('v-time').innerText = p.trans.t;
-            } else {
-                const d = getDistance(p.lat, p.lng, nextP.lat, nextP.lng);
-                document.getElementById('v-method').innerText = "🚗 (預估)";
-                document.getElementById('v-dist').innerText = d + " km";
-                document.getElementById('v-time').innerText = Math.round(d/45*60 + 10) + " min";
-            }
-        } else {
-            dash.style.display = 'none';
-        }
-
-        const query = p.keyword ? p.keyword : (p.title + " 景點 介紹");
-        document.getElementById('info-frame').src = `https://www.google.com/search?q=${encodeURIComponent(query)}&igu=1`;
-        
-        document.getElementById('detail-modal').showModal();
-        markerList.forEach((m, i) => m.setIcon(createIcon(colorMap[allPoints[i].date] || "grey", i === index)));
-    }
 
     function renderMarkers() {
         markerList.forEach(m => map.removeLayer(m));
         markerList = [];
         allPoints.forEach((p, i) => {
             const m = L.marker([p.lat, p.lng], { icon: createIcon(colorMap[p.date] || "grey", false) });
-            m.on('click', (e) => { L.DomEvent.stopPropagation(e); openDetail(i); });
             m.addTo(map);
             markerList.push(m);
         });
     }
 
-    function importData(event) {
-        const reader = new FileReader();
-        reader.onload = (e) => { 
-            allPoints = JSON.parse(e.target.result); 
-            allPoints.sort((a, b) => a.date.localeCompare(b.date));
-            renderMarkers(); 
-            if(allPoints.length > 0) map.fitBounds(new L.featureGroup(markerList).getBounds().pad(0.3));
-        };
-        reader.readAsText(event.target.files[0]);
+    function closeAddModal() {
+        if (tempMarker) map.removeLayer(tempMarker);
+        document.getElementById('add-modal').close();
     }
 
     function exportData() {
         const blob = new Blob([JSON.stringify(allPoints, null, 2)], { type: "application/json" });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = "White6_TravelPlan.json";
+        a.download = "Sendai_Aomori_Trip_Updated.json";
         a.click();
+    }
+
+    function importData(e) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            allPoints = JSON.parse(event.target.result);
+            renderMarkers();
+            if(markerList.length > 0) map.fitBounds(new L.featureGroup(markerList).getBounds().pad(0.3));
+        };
+        reader.readAsText(e.target.files[0]);
     }
 </script>
 </body>
